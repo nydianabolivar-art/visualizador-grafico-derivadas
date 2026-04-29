@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Derivadas en Vivo · Visualizador Interactivo · UCompensar</title>
+
+<!-- math.js para parseo simbólico y derivadas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.min.js"></script>
+
+<!-- MathJax para renderizado de fórmulas -->
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --azul: #1a3a52;
+  --azul-claro: #2c5a7d;
+  --azul-suave: #e8eef4;
+  --naranja: #d97706;
+  --naranja-claro: #fef3e2;
+  --crema: #faf6f0;
+  --papel: #f5efe6;
+  --tinta: #1a1a1a;
+  --tinta-suave: #4a4a4a;
+  --linea: #d4c9b8;
+
+  --color-funcion: #1a3a52;       /* azul para f(x) */
+  --color-derivada: #d97706;      /* naranja para f'(x) */
+  --color-tangente: #16a34a;      /* verde para recta tangente */
+  --color-punto: #dc2626;         /* rojo para punto móvil */
+
+  --verde-ok: #15803d;
+  --rojo-err: #b91c1c;
+
+  --sombra: 0 2px 8px rgba(26, 58, 82, 0.08);
+  --sombra-fuerte: 0 8px 24px rgba(26, 58, 82, 0.15);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--crema);
+  color: var(--tinta);
+  line-height: 1.5;
+  background-image:
+    radial-gradient(circle at 10% 0%, rgba(217, 119, 6, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 90% 100%, rgba(26, 58, 82, 0.05) 0%, transparent 50%);
+  min-height: 100vh;
+}
+
+/* ======== HEADER COMPACTO ======== */
+.header {
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-claro) 100%);
+  color: var(--crema);
+  padding: 1.5rem 2rem;
+  border-bottom: 4px solid var(--naranja);
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: 'd/dx ∂ ∇ Δ lim';
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  font-family: 'Fraunces', serif;
+  font-size: 4rem;
+  font-style: italic;
+  opacity: 0.08;
+  transform: translateY(-50%);
+  letter-spacing: 0.15em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--naranja);
+  margin-bottom: 0.4rem;
+}
+
+.titulo {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.titulo em { font-style: italic; color: var(--naranja); font-weight: 400; }
+
+.subtitulo {
+  font-size: 0.95rem;
+  opacity: 0.9;
+  margin-top: 0.4rem;
+  max-width: 700px;
+}
+
+/* ======== LAYOUT PRINCIPAL ======== */
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 1fr; }
+}
+
+/* ======== PANEL DE CONTROL ======== */
+.panel {
+  background: var(--crema);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--sombra);
+  height: fit-content;
+  position: sticky;
+  top: 1rem;
+}
+
+@media (max-width: 1100px) { .panel { position: static; } }
+
+.panel-titulo {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--azul);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--naranja);
+}
+
+.panel-titulo .num {
+  font-style: italic;
+  color: var(--naranja);
+  font-weight: 400;
+  font-size: 0.95rem;
+}
+
+.panel-seccion { margin-bottom: 1.5rem; }
+
+.label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--tinta-suave);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* ======== INPUT DE FUNCIÓN ======== */
+.input-funcion {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--linea);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  background: white;
+  color: var(--tinta);
+  transition: border-color 0.2s;
+}
+
+.input-funcion:focus {
+  outline: none;
+  border-color: var(--azul);
+  box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.1);
+}
+
+.input-funcion.error { border-color: var(--rojo-err); background: #fee2e2; }
+
+.input-prefijo {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--linea);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.input-prefijo:focus-within { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.1); }
+.input-prefijo.error { border-color: var(--rojo-err); }
+
+.input-prefijo .prefijo {
+  background: var(--azul-suave);
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--azul);
+  border-right: 1.5px solid var(--linea);
+  font-size: 1rem;
+}
+
+.input-prefijo input {
+  flex: 1;
+  border: none;
+  padding: 0.7rem 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  background: transparent;
+  color: var(--tinta);
+}
+
+.input-prefijo input:focus { outline: none; }
+
+.input-help {
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+  margin-top: 0.4rem;
+  line-height: 1.4;
+}
+
+.input-help code {
+  background: var(--papel);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.95em;
+  color: var(--azul);
+}
+
+.error-msg {
+  display: none;
+  background: #fee2e2;
+  color: var(--rojo-err);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  border-left: 3px solid var(--rojo-err);
+}
+
+.error-msg.activo { display: block; }
+
+/* ======== CATÁLOGO DE FUNCIONES ======== */
+.catalogo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.cat-btn {
+  background: white;
+  border: 1.5px solid var(--linea);
+  border-radius: 6px;
+  padding: 0.55rem 0.5rem;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--azul);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.cat-btn:hover {
+  background: var(--azul-suave);
+  border-color: var(--azul);
+  transform: translateY(-1px);
+}
+
+.cat-btn.activa {
+  background: var(--azul);
+  color: white;
+  border-color: var(--azul);
+}
+
+.cat-btn .cat-titulo {
+  display: block;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-bottom: 0.15rem;
+}
+
+/* ======== INFORMACIÓN MATEMÁTICA ======== */
+.info-box {
+  background: white;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.info-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--tinta-suave);
+  margin-bottom: 0.3rem;
+}
+
+.info-valor {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--azul);
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.info-box.fx { border-left: 3px solid var(--color-funcion); }
+.info-box.dfx { border-left: 3px solid var(--color-derivada); }
+.info-box.punto { border-left: 3px solid var(--color-punto); }
+
+/* ======== SLIDERS ======== */
+.slider-container {
+  background: white;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.slider-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--tinta-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slider-valor {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--naranja);
+  font-size: 0.9rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 6px;
+  background: var(--linea);
+  border-radius: 999px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--naranja);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.4);
+  transition: transform 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--naranja);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+/* ======== TOGGLES (mostrar/ocultar capas) ======== */
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  background: white;
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+}
+
+.toggle:hover { background: var(--azul-suave); }
+
+.toggle input { display: none; }
+
+.toggle-marca {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--linea);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle input:checked + .toggle-marca {
+  background: var(--azul);
+  border-color: var(--azul);
+}
+
+.toggle input:checked + .toggle-marca::after {
+  content: '✓';
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.toggle-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.toggle-texto {
+  flex: 1;
+  color: var(--tinta);
+  font-weight: 500;
+}
+
+/* ======== BOTONES DE ACCIÓN ======== */
+.acciones {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.btn {
+  padding: 0.55rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-primario { background: var(--naranja); color: white; }
+.btn-primario:hover { background: #b8620a; transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--azul); border: 1.5px solid var(--azul); }
+.btn-ghost:hover { background: var(--azul); color: white; }
+.btn-secundario { background: var(--azul); color: white; }
+.btn-secundario:hover { background: var(--azul-claro); }
+
+/* ======== ÁREA DE GRÁFICAS ======== */
+.graficas-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.canvas-card {
+  background: white;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: var(--sombra);
+  position: relative;
+}
+
+.canvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.canvas-titulo {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--azul);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.canvas-titulo .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.canvas-acciones {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--linea);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--azul);
+}
+
+.icon-btn:hover { background: var(--azul-suave); border-color: var(--azul); }
+
+canvas {
+  width: 100%;
+  display: block;
+  cursor: crosshair;
+  border-radius: 8px;
+  background: #fcfcfc;
+  background-image:
+    linear-gradient(rgba(26, 58, 82, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 58, 82, 0.04) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+canvas.arrastrando { cursor: grabbing; }
+
+/* ======== AYUDA SUPERPUESTA ======== */
+.ayuda-grafica {
+  position: absolute;
+  top: 4.2rem;
+  right: 1.5rem;
+  background: rgba(26, 58, 82, 0.92);
+  color: white;
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  pointer-events: none;
+  opacity: 0.85;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
+}
+
+.ayuda-grafica strong { color: var(--naranja); }
+
+/* ======== INTERPRETACIÓN ======== */
+.interpretacion {
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+}
+
+.interp-titulo {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  color: var(--azul);
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.interp-titulo::before {
+  content: '◆';
+  color: var(--naranja);
+}
+
+.interp-texto {
+  font-size: 0.88rem;
+  color: var(--tinta-suave);
+  line-height: 1.55;
+}
+
+.interp-texto strong { color: var(--azul); }
+
+.interp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.interp-item {
+  background: white;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--naranja);
+}
+
+.interp-item-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--tinta-suave);
+  margin-bottom: 0.2rem;
+}
+
+.interp-item-valor {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--azul);
+  font-size: 0.85rem;
+}
+
+/* ======== FOOTER ======== */
+.footer {
+  text-align: center;
+  padding: 2.5rem 2rem 1.5rem;
+  border-top: 2px solid var(--linea);
+  margin-top: 3rem;
+  background: var(--papel);
+}
+
+.footer-marca {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--tinta-suave);
+}
+
+.footer-marca strong {
+  font-style: normal;
+  color: var(--azul);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.footer-divider {
+  width: 50px;
+  height: 2px;
+  background: var(--naranja);
+  margin: 0.85rem auto;
+}
+
+.footer-institucion {
+  font-size: 0.8rem;
+  color: var(--tinta-suave);
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 768px) {
+  .app { padding: 1rem; }
+  .panel { padding: 1rem; }
+  .header { padding: 1.25rem 1rem; }
+  .canvas-card { padding: 0.75rem; }
+  .ayuda-grafica { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-content">
+    <div class="eyebrow">Cálculo Diferencial · Visualizador interactivo</div>
+    <h1 class="titulo">Derivadas <em>en vivo</em></h1>
+    <p class="subtitulo">Explore la relación entre una función y su derivada. Mueva el punto, modifique parámetros, escriba sus propias funciones y observe cómo la pendiente de la tangente coincide con el valor de \(f'(x)\).</p>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ============ PANEL IZQUIERDO ============ -->
+  <aside class="panel">
+    <h2 class="panel-titulo"><span class="num">i.</span> Función</h2>
+
+    <div class="panel-seccion">
+      <label class="label">Escriba su función</label>
+      <div class="input-prefijo" id="contenedor-input">
+        <span class="prefijo">f(x) =</span>
+        <input type="text" id="input-fx" value="x^2" placeholder="por ejemplo: x^2 + sin(x)" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="input-help">
+        Operadores: <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>^</code> · funciones: <code>sin</code> <code>cos</code> <code>tan</code> <code>exp</code> <code>log</code> <code>sqrt</code> <code>abs</code> · constantes: <code>pi</code> <code>e</code>
+      </div>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="panel-seccion">
+      <label class="label">O elija una función predefinida</label>
+      <div class="catalogo" id="catalogo">
+        <button class="cat-btn activa" data-fn="x^2"><span class="cat-titulo">Parábola</span>x²</button>
+        <button class="cat-btn" data-fn="x^3 - 3*x"><span class="cat-titulo">Cúbica</span>x³ - 3x</button>
+        <button class="cat-btn" data-fn="sin(x)"><span class="cat-titulo">Seno</span>sin(x)</button>
+        <button class="cat-btn" data-fn="cos(x)"><span class="cat-titulo">Coseno</span>cos(x)</button>
+        <button class="cat-btn" data-fn="exp(x)"><span class="cat-titulo">Exponencial</span>eˣ</button>
+        <button class="cat-btn" data-fn="log(x)"><span class="cat-titulo">Logaritmo</span>ln(x)</button>
+        <button class="cat-btn" data-fn="1/x"><span class="cat-titulo">Hipérbola</span>1/x</button>
+        <button class="cat-btn" data-fn="sqrt(x)"><span class="cat-titulo">Raíz</span>√x</button>
+        <button class="cat-btn" data-fn="abs(x)"><span class="cat-titulo">Valor abs.</span>|x|</button>
+        <button class="cat-btn" data-fn="x^4 - 4*x^2"><span class="cat-titulo">Cuártica</span>x⁴-4x²</button>
+        <button class="cat-btn" data-fn="sin(x)/x"><span class="cat-titulo">Sinc</span>sin(x)/x</button>
+        <button class="cat-btn" data-fn="exp(-x^2)"><span class="cat-titulo">Gaussiana</span>e^(-x²)</button>
+      </div>
+    </div>
+
+    <h2 class="panel-titulo"><span class="num">ii.</span> Punto móvil</h2>
+
+    <div class="panel-seccion">
+      <div class="slider-container">
+        <div class="slider-header">
+          <span class="slider-label">Posición x₀</span>
+          <span class="slider-valor" id="x0-valor">1.00</span>
+        </div>
+        <input type="range" id="slider-x0" min="-10" max="10" step="0.05" value="1">
+      </div>
+
+      <div class="info-box fx">
+        <div class="info-label">Valor de f(x₀)</div>
+        <div class="info-valor" id="info-fx">1.0000</div>
+      </div>
+
+      <div class="info-box dfx">
+        <div class="info-label">Derivada f'(x) — fórmula</div>
+        <div class="info-valor" id="info-derivada-formula">2 x</div>
+      </div>
+
+      <div class="info-box dfx">
+        <div class="info-label">Pendiente f'(x₀)</div>
+        <div class="info-valor" id="info-dfx">2.0000</div>
+      </div>
+
+      <div class="info-box punto">
+        <div class="info-label">Recta tangente</div>
+        <div class="info-valor" id="info-tangente">y = 2x − 1</div>
+      </div>
+    </div>
+
+    <h2 class="panel-titulo"><span class="num">iii.</span> Capas visibles</h2>
+
+    <div class="panel-seccion">
+      <div class="toggles">
+        <label class="toggle">
+          <input type="checkbox" id="t-fx" checked>
+          <span class="toggle-marca"></span>
+          <span class="toggle-color" style="background: var(--color-funcion)"></span>
+          <span class="toggle-texto">Función f(x)</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="t-dfx" checked>
+          <span class="toggle-marca"></span>
+          <span class="toggle-color" style="background: var(--color-derivada)"></span>
+          <span class="toggle-texto">Derivada f'(x)</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="t-tan" checked>
+          <span class="toggle-marca"></span>
+          <span class="toggle-color" style="background: var(--color-tangente)"></span>
+          <span class="toggle-texto">Recta tangente</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="t-rejilla" checked>
+          <span class="toggle-marca"></span>
+          <span class="toggle-color" style="background: #94a3b8"></span>
+          <span class="toggle-texto">Rejilla y ejes</span>
+        </label>
+      </div>
+
+      <div class="acciones">
+        <button class="btn btn-ghost" onclick="centrar()">↔ Centrar</button>
+        <button class="btn btn-ghost" onclick="zoomIn()">+ Zoom</button>
+        <button class="btn btn-ghost" onclick="zoomOut()">− Zoom</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ ÁREA DE GRÁFICAS ============ -->
+  <main class="graficas-area">
+
+    <!-- Gráfica de f(x) -->
+    <div class="canvas-card">
+      <div class="canvas-header">
+        <h3 class="canvas-titulo">
+          <span class="swatch" style="background: var(--color-funcion)"></span>
+          Función f(x)
+          <span style="font-family: 'Fraunces', serif; font-style: italic; color: var(--naranja); font-weight: 400; font-size: 0.85rem; margin-left: 0.5rem;">+ recta tangente en x₀</span>
+        </h3>
+      </div>
+      <canvas id="canvas-fx" width="900" height="420"></canvas>
+      <div class="ayuda-grafica">Arrastre para mover · rueda para zoom · <strong>clic</strong> sobre la curva para mover x₀</div>
+    </div>
+
+    <!-- Gráfica de f'(x) -->
+    <div class="canvas-card">
+      <div class="canvas-header">
+        <h3 class="canvas-titulo">
+          <span class="swatch" style="background: var(--color-derivada)"></span>
+          Derivada f'(x)
+          <span style="font-family: 'Fraunces', serif; font-style: italic; color: var(--naranja); font-weight: 400; font-size: 0.85rem; margin-left: 0.5rem;">la pendiente, función de x</span>
+        </h3>
+      </div>
+      <canvas id="canvas-dfx" width="900" height="320"></canvas>
+    </div>
+
+    <!-- Interpretación pedagógica -->
+    <div class="interpretacion">
+      <h3 class="interp-titulo">Lectura matemática del momento</h3>
+      <p class="interp-texto" id="interp-texto">
+        En el punto <strong>x₀ = 1</strong>, la función vale <strong>f(1) = 1</strong> y su pendiente es <strong>f'(1) = 2</strong>. Esto significa que, justo en ese instante, por cada unidad que avanza x, la función crece dos unidades.
+      </p>
+      <div class="interp-grid">
+        <div class="interp-item">
+          <div class="interp-item-label">Comportamiento</div>
+          <div class="interp-item-valor" id="interp-comportamiento">Creciente</div>
+        </div>
+        <div class="interp-item">
+          <div class="interp-item-label">Concavidad aprox.</div>
+          <div class="interp-item-valor" id="interp-concavidad">Hacia arriba</div>
+        </div>
+        <div class="interp-item">
+          <div class="interp-item-label">¿Punto crítico?</div>
+          <div class="interp-item-valor" id="interp-critico">No</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<footer class="footer">
+  <div class="footer-marca">creada por <strong>Astrid Bolívar</strong></div>
+  <div class="footer-divider"></div>
+  <div class="footer-institucion">Departamento de Ciencias Básicas · Fundación Universitaria Compensar (UCompensar)</div>
+</footer>
+
+<script>
+/* ============================================================
+   ESTADO GLOBAL
+   ============================================================ */
+const estado = {
+  expresionTexto: 'x^2',
+  nodoFx: null,
+  nodoDfx: null,
+  fx: null,           // función compilada
+  dfx: null,          // derivada compilada
+  derivadaTexto: '2 x',
+  x0: 1,
+  // Vista (transformación lógica → píxel)
+  centroX: 0,         // centro x en coordenadas matemáticas
+  centroY: 0,         // centro y en coordenadas matemáticas (gráfica f)
+  escala: 40,         // píxeles por unidad
+  // Capas
+  mostrarFx: true,
+  mostrarDfx: true,
+  mostrarTan: true,
+  mostrarRejilla: true,
+  // Pan
+  arrastrando: false,
+  arrastreInicio: { x: 0, y: 0 },
+  centroInicio: { x: 0, y: 0 },
+  // Canvas
+  canvasFx: null,
+  ctxFx: null,
+  canvasDfx: null,
+  ctxDfx: null
+};
+
+/* ============================================================
+   PARSEO Y DERIVACIÓN
+   ============================================================ */
+function actualizarFuncion(textoExpresion) {
+  estado.expresionTexto = textoExpresion;
+  const errorMsg = document.getElementById('error-msg');
+  const contenedor = document.getElementById('contenedor-input');
+
+  try {
+    // Parseo seguro con math.js
+    const nodo = math.parse(textoExpresion);
+    const compilada = nodo.compile();
+
+    // Probar evaluación
+    compilada.evaluate({ x: 1 });
+
+    estado.nodoFx = nodo;
+    estado.fx = (x) => {
+      try {
+        const v = compilada.evaluate({ x });
+        return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+      } catch { return NaN; }
+    };
+
+    // Derivada simbólica
+    const nodoDeriv = math.derivative(nodo, 'x');
+    const derivCompilada = nodoDeriv.compile();
+    estado.nodoDfx = nodoDeriv;
+    estado.derivadaTexto = nodoDeriv.toString();
+    estado.dfx = (x) => {
+      try {
+        const v = derivCompilada.evaluate({ x });
+        return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+      } catch { return NaN; }
+    };
+
+    // Limpiar errores visuales
+    contenedor.classList.remove('error');
+    errorMsg.classList.remove('activo');
+
+    actualizarPanelInfo();
+    dibujar();
+    return true;
+  } catch (err) {
+    contenedor.classList.add('error');
+    errorMsg.classList.add('activo');
+    errorMsg.textContent = 'Expresión no válida. Revise la sintaxis: ' + (err.message || '').split('\n')[0];
+    return false;
+  }
+}
+
+/* ============================================================
+   ACTUALIZAR PANEL DE INFORMACIÓN
+   ============================================================ */
+function actualizarPanelInfo() {
+  const x0 = estado.x0;
+  const y0 = estado.fx ? estado.fx(x0) : NaN;
+  const dy0 = estado.dfx ? estado.dfx(x0) : NaN;
+
+  document.getElementById('x0-valor').textContent = x0.toFixed(2);
+  document.getElementById('info-fx').textContent = isFinite(y0) ? y0.toFixed(4) : 'No definido';
+  document.getElementById('info-dfx').textContent = isFinite(dy0) ? dy0.toFixed(4) : 'No definido';
+
+  // Derivada simbólica formateada
+  document.getElementById('info-derivada-formula').textContent = estado.derivadaTexto;
+
+  // Recta tangente: y = f(x0) + f'(x0)(x - x0)
+  if (isFinite(y0) && isFinite(dy0)) {
+    const m = dy0;
+    const b = y0 - m * x0;
+    const signo = b >= 0 ? '+' : '−';
+    document.getElementById('info-tangente').textContent =
+      `y = ${m.toFixed(3)} x ${signo} ${Math.abs(b).toFixed(3)}`;
+  } else {
+    document.getElementById('info-tangente').textContent = 'No definida en x₀';
+  }
+
+  // Interpretación pedagógica
+  actualizarInterpretacion(x0, y0, dy0);
+}
+
+function actualizarInterpretacion(x0, y0, dy0) {
+  const txt = document.getElementById('interp-texto');
+  const comp = document.getElementById('interp-comportamiento');
+  const conc = document.getElementById('interp-concavidad');
+  const crit = document.getElementById('interp-critico');
+
+  if (!isFinite(y0) || !isFinite(dy0)) {
+    txt.innerHTML = `En <strong>x₀ = ${x0.toFixed(2)}</strong>, la función no está definida o no es derivable. Pruebe con otra posición.`;
+    comp.textContent = '—';
+    conc.textContent = '—';
+    crit.textContent = '—';
+    return;
+  }
+
+  // Comportamiento
+  let comportamiento, descCrec;
+  if (Math.abs(dy0) < 0.01) {
+    comportamiento = 'Estacionario';
+    descCrec = 'la función ni crece ni decrece (pendiente prácticamente cero)';
+  } else if (dy0 > 0) {
+    comportamiento = 'Creciente';
+    descCrec = `la función crece a razón de <strong>${dy0.toFixed(3)}</strong> unidades de y por cada unidad de x`;
+  } else {
+    comportamiento = 'Decreciente';
+    descCrec = `la función decrece a razón de <strong>${Math.abs(dy0).toFixed(3)}</strong> unidades de y por cada unidad de x`;
+  }
+  comp.textContent = comportamiento;
+
+  // Concavidad aproximada (segunda derivada numérica)
+  const h = 0.001;
+  const d2 = estado.dfx ?
+    (estado.dfx(x0 + h) - estado.dfx(x0 - h)) / (2 * h) : NaN;
+  let concavidad;
+  if (!isFinite(d2)) concavidad = '—';
+  else if (Math.abs(d2) < 0.01) concavidad = 'Inflexión cercana';
+  else if (d2 > 0) concavidad = 'Hacia arriba (∪)';
+  else concavidad = 'Hacia abajo (∩)';
+  conc.textContent = concavidad;
+
+  // Punto crítico
+  const esCritico = Math.abs(dy0) < 0.05;
+  if (esCritico) {
+    if (isFinite(d2) && d2 > 0.01) crit.textContent = 'Mínimo local';
+    else if (isFinite(d2) && d2 < -0.01) crit.textContent = 'Máximo local';
+    else crit.textContent = 'Posible (revisar)';
+  } else {
+    crit.textContent = 'No';
+  }
+
+  txt.innerHTML = `En el punto <strong>x₀ = ${x0.toFixed(2)}</strong>, la función vale <strong>f(${x0.toFixed(2)}) = ${y0.toFixed(3)}</strong> y su pendiente es <strong>f'(${x0.toFixed(2)}) = ${dy0.toFixed(3)}</strong>. Es decir, ${descCrec}. La recta naranja en la gráfica inferior pasa por el punto (${x0.toFixed(2)}, ${dy0.toFixed(3)}), confirmando que la derivada <em>es</em> la función pendiente.`;
+}
+
+/* ============================================================
+   TRANSFORMACIONES DE COORDENADAS
+   ============================================================ */
+function xMatToPix(x, canvas) {
+  return canvas.width / 2 + (x - estado.centroX) * estado.escala;
+}
+
+function yMatToPix(y, canvas, centroYLocal) {
+  return canvas.height / 2 - (y - centroYLocal) * estado.escala;
+}
+
+function xPixToMat(px, canvas) {
+  return estado.centroX + (px - canvas.width / 2) / estado.escala;
+}
+
+function yPixToMat(py, canvas, centroYLocal) {
+  return centroYLocal - (py - canvas.height / 2) / estado.escala;
+}
+
+/* ============================================================
+   DIBUJO PRINCIPAL
+   ============================================================ */
+function dibujar() {
+  if (!estado.canvasFx) return;
+  ajustarTamano();
+  dibujarGraficaFx();
+  dibujarGraficaDfx();
+}
+
+function ajustarTamano() {
+  // Ajustar canvas para resolución de pantalla
+  [estado.canvasFx, estado.canvasDfx].forEach(canvas => {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+    }
+  });
+}
+
+function dibujarRejilla(ctx, canvas, centroYLocal) {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  if (estado.mostrarRejilla) {
+    // Rejilla menor
+    ctx.strokeStyle = 'rgba(26, 58, 82, 0.06)';
+    ctx.lineWidth = 1;
+
+    const xMin = xPixToMat(0, { width: w });
+    const xMax = xPixToMat(w, { width: w });
+    const yMin = yPixToMat(h, { height: h }, centroYLocal);
+    const yMax = yPixToMat(0, { height: h }, centroYLocal);
+
+    // Determinar paso de rejilla en función del zoom
+    const espacio = estado.escala;
+    let paso = 1;
+    if (espacio < 25) paso = 2;
+    if (espacio < 12) paso = 5;
+    if (espacio > 80) paso = 0.5;
+    if (espacio > 160) paso = 0.25;
+
+    ctx.beginPath();
+    for (let x = Math.ceil(xMin / paso) * paso; x <= xMax; x += paso) {
+      const px = xMatToPix(x, { width: w });
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, h);
+    }
+    for (let y = Math.ceil(yMin / paso) * paso; y <= yMax; y += paso) {
+      const py = yMatToPix(y, { height: h }, centroYLocal);
+      ctx.moveTo(0, py);
+      ctx.lineTo(w, py);
+    }
+    ctx.stroke();
+
+    // Ejes
+    ctx.strokeStyle = 'rgba(26, 58, 82, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const ejeY = xMatToPix(0, { width: w });
+    const ejeX = yMatToPix(0, { height: h }, centroYLocal);
+    if (ejeY >= 0 && ejeY <= w) {
+      ctx.moveTo(ejeY, 0);
+      ctx.lineTo(ejeY, h);
+    }
+    if (ejeX >= 0 && ejeX <= h) {
+      ctx.moveTo(0, ejeX);
+      ctx.lineTo(w, ejeX);
+    }
+    ctx.stroke();
+
+    // Etiquetas numéricas
+    ctx.fillStyle = 'rgba(26, 58, 82, 0.65)';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let x = Math.ceil(xMin / paso) * paso; x <= xMax; x += paso) {
+      if (Math.abs(x) < 1e-9) continue;
+      const px = xMatToPix(x, { width: w });
+      const label = paso < 1 ? x.toFixed(2) : x.toString();
+      const py = ejeX >= 0 && ejeX <= h ? Math.min(ejeX + 4, h - 14) : h - 14;
+      ctx.fillText(label, px, py);
+    }
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let y = Math.ceil(yMin / paso) * paso; y <= yMax; y += paso) {
+      if (Math.abs(y) < 1e-9) continue;
+      const py = yMatToPix(y, { height: h }, centroYLocal);
+      const label = paso < 1 ? y.toFixed(2) : y.toString();
+      const px = ejeY >= 0 && ejeY <= w ? Math.max(ejeY - 4, 30) : 30;
+      ctx.fillText(label, px, py);
+    }
+
+    // Origen
+    if (ejeY >= 0 && ejeY <= w && ejeX >= 0 && ejeX <= h) {
+      ctx.fillStyle = 'rgba(26, 58, 82, 0.65)';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('0', ejeY - 4, ejeX + 4);
+    }
+  }
+}
+
+function dibujarCurva(ctx, canvas, fn, color, lineWidth, centroYLocal) {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const xMin = xPixToMat(0, { width: w });
+  const xMax = xPixToMat(w, { width: w });
+  const paso = (xMax - xMin) / w;  // un punto por pixel
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineJoin = 'round';
+
+  let dibujando = false;
+  ctx.beginPath();
+  let yAnterior = NaN;
+
+  for (let i = 0; i <= w; i++) {
+    const x = xMin + i * paso;
+    const y = fn(x);
+
+    if (!isFinite(y)) {
+      dibujando = false;
+      yAnterior = NaN;
+      continue;
+    }
+
+    // Detectar saltos grandes (asíntotas, discontinuidades)
+    if (isFinite(yAnterior) && Math.abs(y - yAnterior) > h / estado.escala * 5) {
+      dibujando = false;
+    }
+
+    const py = yMatToPix(y, { height: h }, centroYLocal);
+
+    if (!dibujando) {
+      ctx.moveTo(i, py);
+      dibujando = true;
+    } else {
+      ctx.lineTo(i, py);
+    }
+    yAnterior = y;
+  }
+  ctx.stroke();
+}
+
+function dibujarGraficaFx() {
+  const ctx = estado.ctxFx;
+  const canvas = estado.canvasFx;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Fondo sutil
+  ctx.fillStyle = '#fcfcfc';
+  ctx.fillRect(0, 0, w, h);
+
+  // Rejilla
+  dibujarRejilla(ctx, canvas, estado.centroY);
+
+  if (!estado.fx) return;
+
+  // Curva f(x)
+  if (estado.mostrarFx) {
+    dibujarCurva(ctx, canvas, estado.fx, getComputedStyle(document.documentElement).getPropertyValue('--color-funcion').trim(), 2.5, estado.centroY);
+  }
+
+  // Recta tangente en x0
+  if (estado.mostrarTan && estado.dfx) {
+    const x0 = estado.x0;
+    const y0 = estado.fx(x0);
+    const m = estado.dfx(x0);
+
+    if (isFinite(y0) && isFinite(m)) {
+      const xMin = xPixToMat(0, { width: w });
+      const xMax = xPixToMat(w, { width: w });
+      const yIzq = y0 + m * (xMin - x0);
+      const yDer = y0 + m * (xMax - x0);
+
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-tangente').trim();
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, yMatToPix(yIzq, { height: h }, estado.centroY));
+      ctx.lineTo(w, yMatToPix(yDer, { height: h }, estado.centroY));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Etiqueta de pendiente
+      const px0 = xMatToPix(x0, { width: w });
+      const py0 = yMatToPix(y0, { height: h }, estado.centroY);
+
+      // Triángulo de pendiente (visualización dy/dx)
+      if (isFinite(m) && Math.abs(m) < 100) {
+        const dx = 1.2;
+        const x1px = xMatToPix(x0 + dx, { width: w });
+        const y1px = yMatToPix(y0, { height: h }, estado.centroY);
+        const y2px = yMatToPix(y0 + m * dx, { height: h }, estado.centroY);
+
+        ctx.strokeStyle = 'rgba(22, 163, 74, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px0, py0);
+        ctx.lineTo(x1px, y1px);
+        ctx.lineTo(x1px, y2px);
+        ctx.stroke();
+
+        // Etiquetas dx, dy
+        ctx.fillStyle = 'rgba(22, 163, 74, 0.85)';
+        ctx.font = 'italic 11px Fraunces, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Δx', (px0 + x1px) / 2, y1px + 14);
+        ctx.textAlign = 'left';
+        ctx.fillText('Δy', x1px + 5, (y1px + y2px) / 2);
+      }
+    }
+  }
+
+  // Punto móvil
+  if (estado.fx) {
+    const x0 = estado.x0;
+    const y0 = estado.fx(x0);
+    if (isFinite(y0)) {
+      const px = xMatToPix(x0, { width: w });
+      const py = yMatToPix(y0, { height: h }, estado.centroY);
+
+      // Línea vertical guía
+      ctx.strokeStyle = 'rgba(220, 38, 38, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Punto
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-punto').trim();
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Etiqueta del punto
+      ctx.fillStyle = 'rgba(26, 58, 82, 0.95)';
+      ctx.font = '600 11px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const labelTexto = `(${x0.toFixed(2)}, ${y0.toFixed(2)})`;
+      const labelX = px + 12;
+      const labelY = py - 14;
+      // Fondo translúcido para legibilidad
+      const metrics = ctx.measureText(labelTexto);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillRect(labelX - 3, labelY - 9, metrics.width + 6, 16);
+      ctx.fillStyle = 'rgba(26, 58, 82, 0.95)';
+      ctx.fillText(labelTexto, labelX, labelY);
+    }
+  }
+}
+
+function dibujarGraficaDfx() {
+  const ctx = estado.ctxDfx;
+  const canvas = estado.canvasDfx;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#fcfcfc';
+  ctx.fillRect(0, 0, w, h);
+
+  // El centroY de la gráfica de derivadas es siempre 0 (centrada)
+  const centroYDfx = 0;
+
+  dibujarRejilla(ctx, canvas, centroYDfx);
+
+  if (!estado.dfx) return;
+
+  if (estado.mostrarDfx) {
+    dibujarCurva(ctx, canvas, estado.dfx, getComputedStyle(document.documentElement).getPropertyValue('--color-derivada').trim(), 2.5, centroYDfx);
+  }
+
+  // Punto sincronizado en la derivada
+  const x0 = estado.x0;
+  const dy0 = estado.dfx(x0);
+  if (isFinite(dy0)) {
+    const px = xMatToPix(x0, { width: w });
+    const py = yMatToPix(dy0, { height: h }, centroYDfx);
+
+    // Línea vertical guía sincronizada
+    ctx.strokeStyle = 'rgba(220, 38, 38, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Línea horizontal hasta el punto (mostrando que ese valor ES la pendiente)
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, py);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Punto
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-derivada').trim();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Etiqueta
+    ctx.fillStyle = 'rgba(26, 58, 82, 0.95)';
+    ctx.font = '600 11px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const labelTexto = `f'(${x0.toFixed(2)}) = ${dy0.toFixed(3)}`;
+    const labelX = px + 12;
+    const labelY = py - 14;
+    const metrics = ctx.measureText(labelTexto);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillRect(labelX - 3, labelY - 9, metrics.width + 6, 16);
+    ctx.fillStyle = 'rgba(26, 58, 82, 0.95)';
+    ctx.fillText(labelTexto, labelX, labelY);
+  }
+}
+
+/* ============================================================
+   INTERACCIÓN: PAN, ZOOM, CLIC, ARRASTRE
+   ============================================================ */
+function configurarInteraccion(canvas, esGraficaFx) {
+  // Arrastre para pan
+  canvas.addEventListener('mousedown', (e) => {
+    estado.arrastrando = true;
+    estado.arrastreInicio = { x: e.clientX, y: e.clientY };
+    estado.centroInicio = { x: estado.centroX, y: esGraficaFx ? estado.centroY : 0 };
+    estado.modoArrastre = e.shiftKey ? 'pan' : (esGraficaFx ? 'punto' : 'pan');
+
+    // Si es clic sobre la gráfica de f(x) (sin shift), mover x0
+    if (esGraficaFx && !e.shiftKey) {
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      estado.x0 = xPixToMat(px, { width: canvas.clientWidth });
+      const slider = document.getElementById('slider-x0');
+      if (estado.x0 < parseFloat(slider.min)) slider.min = estado.x0;
+      if (estado.x0 > parseFloat(slider.max)) slider.max = estado.x0;
+      slider.value = estado.x0;
+      actualizarPanelInfo();
+      dibujar();
+    }
+
+    canvas.classList.add('arrastrando');
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!estado.arrastrando) return;
+
+    const dx = e.clientX - estado.arrastreInicio.x;
+    const dy = e.clientY - estado.arrastreInicio.y;
+
+    if (estado.modoArrastre === 'punto' && esGraficaFx) {
+      // Mover punto x0 mientras se arrastra
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      estado.x0 = xPixToMat(px, { width: canvas.clientWidth });
+      const slider = document.getElementById('slider-x0');
+      if (estado.x0 < parseFloat(slider.min)) slider.min = estado.x0;
+      if (estado.x0 > parseFloat(slider.max)) slider.max = estado.x0;
+      slider.value = estado.x0;
+      actualizarPanelInfo();
+      dibujar();
+    } else {
+      // Pan
+      estado.centroX = estado.centroInicio.x - dx / estado.escala;
+      if (esGraficaFx) {
+        estado.centroY = estado.centroInicio.y + dy / estado.escala;
+      }
+      dibujar();
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    estado.arrastrando = false;
+    canvas.classList.remove('arrastrando');
+  });
+
+  // Zoom con rueda
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const escalaNueva = Math.max(5, Math.min(500, estado.escala * factor));
+
+    // Zoom centrado en posición del cursor
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const xMat = xPixToMat(px, { width: canvas.clientWidth });
+    const centroYLocal = esGraficaFx ? estado.centroY : 0;
+    const yMat = yPixToMat(py, { height: canvas.clientHeight }, centroYLocal);
+
+    estado.escala = escalaNueva;
+
+    // Reajustar centro para mantener cursor en mismo punto matemático
+    estado.centroX = xMat - (px - canvas.clientWidth / 2) / estado.escala;
+    if (esGraficaFx) {
+      estado.centroY = yMat + (py - canvas.clientHeight / 2) / estado.escala;
+    }
+
+    dibujar();
+  }, { passive: false });
+
+  // Soporte táctil básico (un dedo = pan)
+  let toqueInicio = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      toqueInicio = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      estado.centroInicio = { x: estado.centroX, y: esGraficaFx ? estado.centroY : 0 };
+
+      if (esGraficaFx) {
+        const rect = canvas.getBoundingClientRect();
+        const px = e.touches[0].clientX - rect.left;
+        estado.x0 = xPixToMat(px, { width: canvas.clientWidth });
+        const slider = document.getElementById('slider-x0');
+        if (estado.x0 < parseFloat(slider.min)) slider.min = estado.x0;
+        if (estado.x0 > parseFloat(slider.max)) slider.max = estado.x0;
+        slider.value = estado.x0;
+        actualizarPanelInfo();
+        dibujar();
+      }
+    }
+  });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1 && toqueInicio && esGraficaFx) {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const px = e.touches[0].clientX - rect.left;
+      estado.x0 = xPixToMat(px, { width: canvas.clientWidth });
+      const slider = document.getElementById('slider-x0');
+      if (estado.x0 < parseFloat(slider.min)) slider.min = estado.x0;
+      if (estado.x0 > parseFloat(slider.max)) slider.max = estado.x0;
+      slider.value = estado.x0;
+      actualizarPanelInfo();
+      dibujar();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { toqueInicio = null; });
+}
+
+/* ============================================================
+   FUNCIONES UTILITARIAS DE VISTA
+   ============================================================ */
+function centrar() {
+  estado.centroX = 0;
+  estado.centroY = 0;
+  estado.escala = 40;
+  dibujar();
+}
+
+function zoomIn() {
+  estado.escala = Math.min(500, estado.escala * 1.3);
+  dibujar();
+}
+
+function zoomOut() {
+  estado.escala = Math.max(5, estado.escala / 1.3);
+  dibujar();
+}
+
+/* ============================================================
+   INICIALIZACIÓN
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  estado.canvasFx = document.getElementById('canvas-fx');
+  estado.ctxFx = estado.canvasFx.getContext('2d');
+  estado.canvasDfx = document.getElementById('canvas-dfx');
+  estado.ctxDfx = estado.canvasDfx.getContext('2d');
+
+  // Listeners
+  const inputFx = document.getElementById('input-fx');
+  inputFx.addEventListener('input', (e) => {
+    actualizarFuncion(e.target.value);
+    // Quitar "activa" del catálogo
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('activa'));
+  });
+
+  // Catálogo de funciones
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fn = btn.dataset.fn;
+      inputFx.value = fn;
+      actualizarFuncion(fn);
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('activa'));
+      btn.classList.add('activa');
+    });
+  });
+
+  // Slider x0
+  document.getElementById('slider-x0').addEventListener('input', (e) => {
+    estado.x0 = parseFloat(e.target.value);
+    actualizarPanelInfo();
+    dibujar();
+  });
+
+  // Toggles
+  document.getElementById('t-fx').addEventListener('change', (e) => { estado.mostrarFx = e.target.checked; dibujar(); });
+  document.getElementById('t-dfx').addEventListener('change', (e) => { estado.mostrarDfx = e.target.checked; dibujar(); });
+  document.getElementById('t-tan').addEventListener('change', (e) => { estado.mostrarTan = e.target.checked; dibujar(); });
+  document.getElementById('t-rejilla').addEventListener('change', (e) => { estado.mostrarRejilla = e.target.checked; dibujar(); });
+
+  // Interacción canvas
+  configurarInteraccion(estado.canvasFx, true);
+  configurarInteraccion(estado.canvasDfx, false);
+
+  // Resize
+  window.addEventListener('resize', dibujar);
+
+  // Iniciar
+  actualizarFuncion('x^2');
+});
+</script>
+
+</body>
+</html>
